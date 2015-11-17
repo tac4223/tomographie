@@ -18,6 +18,7 @@ class ct(object):
         self.input_img = None
         self.res = None
         self.sinogram = None
+        self.ubp = None
 
     def read_image(self, filename):
         if re.search(r"(\.npy$)",filename):
@@ -28,7 +29,7 @@ class ct(object):
 
         self.res = self.input_img.shape[0]
         self.filename = filename
-        self.show_image(self.input_img)
+        self.show_image(self.input_img,"Ausgangsbild")
 
     def input_chain(self,prompt,expected_type):
         """
@@ -44,9 +45,10 @@ class ct(object):
                 format(query))
             self.input_chain(prompt, expected_type)
 
-    def show_image(self,image):
+    def show_image(self,image,title=None):
         current_image = plt.imshow(image)
         current_image.set_cmap("gray")
+        plt.title(title), plt.xticks([]), plt.yticks([])
         plt.show(current_image)
 
     def get_angles(self):
@@ -73,7 +75,7 @@ class ct(object):
             np.cos(angle - x*np.pi/2) + self.res/2, (2,self.res,self.res))
 
     def rotate_image(self, angle=0, image=None):
-        if image == None: image = self.input_img
+        if np.all(image) == None: image = self.input_img
         rotated_image = sip.map_coordinates(image,self.get_indices(angle))
         rotated_image[rotated_image < 0] = 0
         return rotated_image
@@ -83,11 +85,46 @@ class ct(object):
         for angle in range(self.angle_count):
             self.sinogram[angle,:-1] = np.sum(
                 self.rotate_image(self.angles[angle]),axis=1)
-            self.sinogram[angle,-1] = self.angles[angle]
-        self.show_image(self.sinogram)
+        self.sinogram[:,-1] = self.angles
+        self.show_image(self.sinogram, "erzeugtes Sinogramm")
+
+    def save_sinogram(self, filename):
+        np.save(filename, self.sinogram)
+
+    def load_sinogram(self, filename):
+        self.filename = filename
+        self.sinogram = np.load(filename)
+        self.res = self.sinogram.shape[0]
+        self.angles = self.sinogram[:,-1]
+        self.angle_count = len(self.angles)
+        self.show_image(self.sinogram, "geladenes Sinogramm")
+
+    def unfiltered_back(self):
+        image = np.zeros((self.res,self.res))
+        for line in self.sinogram:
+            image += self.rotate_image(-line[-1]-90,
+            np.ones((self.res,self.res)) * line[:-1])
+        self.ubp = image
+
+    def ramp_filter(self,image):
+        ft_image = np.fft.fftshift(np.fft.fft2(image))
+        ramp = np.fromfunction(lambda x,y: np.sqrt((x-self.res/2)**2 +
+            (y - self.res/2)**2),ft_image.shape)
+        edge = ramp >= self.res/2.1
+        ft_image *= ramp
+        ft_image = np.abs(np.fft.ifft2(np.fft.ifftshift(ft_image)))
+        ft_image[edge] = 0
+        return ft_image
 
 
 a = ct()
 a.read_image("bilder\CT512.npy")
-a.get_angles()
-a.create_sinogram()
+#a.get_angles()
+#a.arc = 360
+#a.angle_count = 360
+#a.angles = np.linspace(0,360,360)
+#a.create_sinogram()
+a.load_sinogram("bilder\CT sinogram.npy")
+a.unfiltered_back()
+#a.show_image(a.ubp)
+a.show_image(a.ramp_filter(a.ubp))
