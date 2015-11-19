@@ -11,7 +11,7 @@ import scipy.ndimage.interpolation as sip
 import re
 
 
-class scanner(object):
+class scan(object):
 
     def __init__(self):
         self.filename = None
