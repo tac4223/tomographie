@@ -94,7 +94,7 @@ class scan(object):
     def load_sinogram(self, filename):
         self.filename = filename
         self.sinogram = np.load(filename)
-        self.res = self.sinogram.shape[0]
+        self.res = self.sinogram.shape[1] - 1
         self.angles = self.sinogram[:,-1]
         self.angle_count = len(self.angles)
         self.show_image(self.sinogram, "geladenes Sinogramm")
@@ -117,14 +117,14 @@ class scan(object):
         return ft_image
 
 
-#a = scanner()
+a = scan()
 #a.read_image("bilder\CT512.npy")
 #a.get_angles()
 #a.arc = 360
 #a.angle_count = 360
 #a.angles = np.linspace(0,360,360)
 #a.create_sinogram()
-#a.load_sinogram("bilder\CT sinogram.npy")
-#a.unfiltered_back()
-#a.show_image(a.ubp)
-#a.show_image(a.ramp_filter(a.ubp))
+a.load_sinogram("bilder\CT sinogram.npy")
+a.unfiltered_back()
+a.show_image(a.ubp)
+a.show_image(a.ramp_filter(a.ubp))

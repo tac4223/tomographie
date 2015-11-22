@@ -16,36 +16,27 @@ import tkFileDialog as tkf
 class ct:
 
     def __init__(self, master):
-        self.arc = 180
-        self.filename = None
-        self.input_array = None
-        self.output_array = None
-        self.res = None
-        self.sinogram = None
-        self.ubp = None
-        self.fbp = None
-        self.do_recon = 0
-        self.filter = 0
-        self.ltemp = None
-        self.rtemp = None
+        self.var_init()
 
+        sidebar = tk.Frame(master,padx=5,pady=5)
+        sidebar.pack(side=tk.LEFT)
 
-        self.sidebar = tk.Frame(master,padx=5,pady=5)
-        self.sidebar.pack(side=tk.LEFT)
+        graph_frame = tk.Frame(master,padx=5,pady=5)
+        graph_frame.pack(fill=tk.BOTH,side=tk.RIGHT)
 
-        self.graph_frame = tk.Frame(master,padx=5,pady=5)
-        self.graph_frame.pack(fill=tk.BOTH,side=tk.RIGHT)
-
-        self.input_frame = tk.LabelFrame(self.graph_frame,text="Ausgangsbild/geladenes Sinogramm",padx=5,pady=5)
-        self.input_frame.pack(fill=tk.BOTH,padx=10,pady=10,side=tk.LEFT)
-        self.input_canvas = tk.Canvas(self.input_frame,width=512,height=512)
+        input_frame = tk.LabelFrame(graph_frame,text="Ausgangsbild/geladenes Sinogramm",padx=5,pady=5)
+        input_frame.pack(fill=tk.BOTH,padx=10,pady=10,side=tk.LEFT)
+        self.input_canvas = tk.Canvas(input_frame,width=512,height=512)
         self.input_canvas.pack(side=tk.LEFT)
-        self.output_frame = tk.LabelFrame(self.graph_frame,text="berechnetes Sinogramm/Rekonstruktion",padx=5,pady=5)
-        self.output_frame.pack(fill=tk.BOTH,padx=10,pady=10,side=tk.RIGHT)
-        self.output_canvas = tk.Canvas(self.output_frame,width=512,height=512)
+        output_frame = tk.LabelFrame(graph_frame,text="berechnetes Sinogramm/Rekonstruktion",padx=5,pady=5)
+        output_frame.pack(fill=tk.BOTH,padx=10,pady=10,side=tk.RIGHT)
+        self.output_canvas = tk.Canvas(output_frame,width=512,height=512)
         self.output_canvas.pack(fill=tk.BOTH,side=tk.RIGHT)
 
-        self.sino_settings = tk.LabelFrame(self.sidebar, text="Sinogramm",padx=5,pady=5)
+
+
+        self.sino_settings = tk.LabelFrame(sidebar, text="Sinogramm",padx=5,pady=5)
+        self.arc = tk.IntVar(self.sino_settings)
         self.sino_settings.pack(fill=tk.X,side=tk.TOP)
         loadimg = tk.Button(self.sino_settings,text="Ausgangsbild laden",command=self.read_image)
         loadimg.pack(fill=tk.X)
@@ -62,7 +53,7 @@ class ct:
         save_sino.pack(fill=tk.X)
 
 
-        filter_settings = tk.LabelFrame(self.sidebar, text="Rekonstruktion",padx=5,pady=5)
+        filter_settings = tk.LabelFrame(sidebar, text="Rekonstruktion",padx=5,pady=5)
         filter_settings.pack(fill=tk.X,side=tk.TOP)
         note = tk.LabelFrame(filter_settings,text="optional:",padx=5,pady=5)
         note.pack()
@@ -78,7 +69,28 @@ class ct:
         save_reco.pack(fill=tk.X)
 
 
+
+    def var_init(self):
+        """
+        Um sicher zu gehen dass auch beim Neuladen der Bilder jeweils alle
+        Variablen im Ausgangszustand sind, bietet sich diese Funktion an.
+        """
+
+        self.filename = None
+        self.input_array = None
+        self.output_array = None
+        self.res = None
+        self.sinogram = None
+        self.ubp = None
+        self.fbp = None
+        self.do_recon = 0
+        self.filter = 0
+        self.ltemp = None
+        self.rtemp = None
+
+
     def read_image(self):
+        self.var_init()
         filename = tkf.askopenfilename()
         if re.search(r"(\.npy$)",filename):
             self.input_array = np.load(filename)
@@ -90,14 +102,11 @@ class ct:
         self.show_image(self.input_array,0,self.input_canvas)
 
     def read_sino(self):
-        if self.do_recon == 1:
-            arr = self.output_array
-        elif self.do_recon == 0:
-            filename = tkf.askopenfilename()
-            arr = np.load(filename)
+        filename = tkf.askopenfilename()
+        arr = np.load(filename)
         self.input_array = arr
         self.angles = arr[:,-1]
-        self.res = self.input_array.shape[0]
+        self.res = self.input_array.shape[1] - 1
         self.show_image(self.input_array,0,self.input_canvas)
 
 
@@ -106,6 +115,7 @@ class ct:
         np.save(filename,self.output_array)
 
     def show_image(self,data,temp,target):
+        data *= 1./np.max(data) * 256
         size = 512,512
         if temp == 0:
             self.ltemp = Image.fromarray(data)
@@ -128,19 +138,19 @@ class ct:
             np.sin(angle + x*np.pi/2) + (-1)**x * (y - (self.res-1)/2)*
             np.cos(angle - x*np.pi/2) + self.res/2, (2,self.res,self.res))
 
-    def rotate_image(self, angle=0,image=None):
+    def rotate_image(self, angle,image):
         rotated_image = sip.map_coordinates(image,self.get_indices(angle))
         rotated_image[rotated_image < 0] = 0
         return rotated_image
 
     def create_sinogram(self):
         self.angle_count = self.angle_picker.get()
-        self.angles = np.linspace(0,self.arc,self.angle_count)
+        self.angles = np.linspace(0,self.arc.get(),self.angle_count)
         self.sinogram = np.zeros((self.angle_count,self.res+1))
 
         for angle in range(self.angle_count):
             self.sinogram[angle,:-1] = np.sum(
-                self.rotate_image(self.angles[angle]),axis=1)
+                self.rotate_image(self.angles[angle],self.input_array),axis=1)
         self.sinogram[:,-1] = self.angles
         self.output_array = self.sinogram
         self.show_image(self.sinogram,1,self.output_canvas)
@@ -153,7 +163,7 @@ class ct:
         image = np.zeros((self.res,self.res))
         for line in self.input_array:
             image += self.rotate_image(-line[-1]-90,
-            np.ones((self.res,self.res)) * line[:-1])
+            np.ones((self.res,self.res)) * line[0:-1])
         self.output_array = image
         if self.filter == 1:
             self.ramp_filter(image)
@@ -171,6 +181,6 @@ class ct:
         self.output_array = ft_image
 
 root = tk.Tk()
-root.title("Computed Pytograhpy")
+root.title("Computed Pytography")
 test = ct(root)
 root.mainloop()
