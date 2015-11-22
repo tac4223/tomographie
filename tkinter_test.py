@@ -68,8 +68,8 @@ class ct:
         unfiltered.pack(fill=tk.X)
         ramp = tk.Radiobutton(filters,text="Ramp-Filter",variable=self.filterchoice,value=1,indicatoron=0,command=self.filtering)
         ramp.pack(fill=tk.X)
-        shepp = tk.Radiobutton(filters,text="Shepp-Logan",variable=self.filterchoice,value=2,indicatoron=0,command=self.filtering)
-        shepp.pack(fill=tk.X)
+#        shepp = tk.Radiobutton(filters,text="Shepp-Logan",variable=self.filterchoice,value=2,indicatoron=0,command=self.filtering)
+#        shepp.pack(fill=tk.X)
 
     def read_image(self):
         filename = tkf.askopenfilename()
@@ -151,13 +151,12 @@ class ct:
         self.show_image(self.ubp,1,self.output_canvas)
 
     def filtering(self):
-        self.input_array = self.ubp
-        self.show_image(self.ubp,0,self.input_canvas)
-
         if self.filterchoice.get() == 0:
             self.output_array = self.ubp
         elif self.filterchoice.get() == 1:
             self.output_array = self.ramp_filter()
+        elif self.filterchoice.get() == 2:
+            self.output_array = self.shepp_logan()
 
         self.show_image(self.output_array,1,self.output_canvas)
 
@@ -167,9 +166,9 @@ class ct:
         ft_image = np.fft.fftshift(np.fft.fft2(image))
         ramp = np.fromfunction(lambda x,y: np.sqrt((x-self.res/2)**2 +
             (y - self.res/2)**2),ft_image.shape)
-        edge = ramp >= self.res/2.1
         ft_image *= ramp
         ft_image = np.abs(np.fft.ifft2(np.fft.ifftshift(ft_image)))
+        edge = ramp >= self.res/2.05
         ft_image[edge] = 0
         return ft_image
 
