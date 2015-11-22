@@ -117,14 +117,14 @@ class scanner(object):
         return ft_image
 
 
-#a = scanner()
-#a.read_image("bilder\CT512.npy")
-#a.get_angles()
+a = scanner()
+a.read_image("bilder\CT512.npy")
+a.get_angles()
 #a.arc = 360
 #a.angle_count = 360
 #a.angles = np.linspace(0,360,360)
-#a.create_sinogram()
+a.create_sinogram()
 #a.load_sinogram("bilder\CT sinogram.npy")
-#a.unfiltered_back()
-#a.show_image(a.ubp)
-#a.show_image(a.ramp_filter(a.ubp))
+a.unfiltered_back()
+a.show_image(a.ubp)
+a.show_image(a.ramp_filter(a.ubp))

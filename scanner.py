@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Oct 19 11:03:23 2015
-
 @author: sengery
 """
 
@@ -11,7 +10,7 @@ import scipy.ndimage.interpolation as sip
 import re
 
 
-class scan(object):
+class scanner(object):
 
     def __init__(self):
         self.filename = None
@@ -94,7 +93,7 @@ class scan(object):
     def load_sinogram(self, filename):
         self.filename = filename
         self.sinogram = np.load(filename)
-        self.res = self.sinogram.shape[1] - 1
+        self.res = self.sinogram.shape[0]
         self.angles = self.sinogram[:,-1]
         self.angle_count = len(self.angles)
         self.show_image(self.sinogram, "geladenes Sinogramm")
@@ -115,16 +114,3 @@ class scan(object):
         ft_image = np.abs(np.fft.ifft2(np.fft.ifftshift(ft_image)))
         ft_image[edge] = 0
         return ft_image
-
-
-a = scan()
-#a.read_image("bilder\CT512.npy")
-#a.get_angles()
-#a.arc = 360
-#a.angle_count = 360
-#a.angles = np.linspace(0,360,360)
-#a.create_sinogram()
-a.load_sinogram("bilder\CT sinogram.npy")
-a.unfiltered_back()
-a.show_image(a.ubp)
-a.show_image(a.ramp_filter(a.ubp))

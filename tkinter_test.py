@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Nov 18 09:57:27 2015
-
 @author: mick
 """
 import matplotlib
@@ -16,8 +15,6 @@ import tkFileDialog as tkf
 class ct:
 
     def __init__(self, master):
-        self.var_init()
-
         sidebar = tk.Frame(master,padx=5,pady=5)
         sidebar.pack(side=tk.LEFT)
 
@@ -27,16 +24,20 @@ class ct:
         input_frame = tk.LabelFrame(graph_frame,text="Ausgangsbild/geladenes Sinogramm",padx=5,pady=5)
         input_frame.pack(fill=tk.BOTH,padx=10,pady=10,side=tk.LEFT)
         self.input_canvas = tk.Canvas(input_frame,width=512,height=512)
-        self.input_canvas.pack(side=tk.LEFT)
+        self.input_canvas.pack(side=tk.TOP)
+        saveleft = tk.Button(input_frame,text="Bild speichern",command=self.save_left)
+        saveleft.pack(side=tk.BOTTOM)
         output_frame = tk.LabelFrame(graph_frame,text="berechnetes Sinogramm/Rekonstruktion",padx=5,pady=5)
         output_frame.pack(fill=tk.BOTH,padx=10,pady=10,side=tk.RIGHT)
         self.output_canvas = tk.Canvas(output_frame,width=512,height=512)
-        self.output_canvas.pack(fill=tk.BOTH,side=tk.RIGHT)
+        self.output_canvas.pack(fill=tk.BOTH,side=tk.TOP)
+        saveright = tk.Button(output_frame,text="Bild speichern",command=self.save_right)
+        saveright.pack(side=tk.BOTTOM)
 
 
 
         self.sino_settings = tk.LabelFrame(sidebar, text="Sinogramm",padx=5,pady=5)
-        self.arc = tk.IntVar(self.sino_settings)
+        self.arc = tk.IntVar(self.sino_settings,180)
         self.sino_settings.pack(fill=tk.X,side=tk.TOP)
         loadimg = tk.Button(self.sino_settings,text="Ausgangsbild laden",command=self.read_image)
         loadimg.pack(fill=tk.X)
@@ -49,52 +50,31 @@ class ct:
         self.angle_picker.pack(fill=tk.X)
         go_sino = tk.Button(self.sino_settings,text="Starten",command=self.create_sinogram)
         go_sino.pack(fill=tk.X)
-        save_sino = tk.Button(self.sino_settings,text="Sinogramm\nspeichern",command=self.save_image)
-        save_sino.pack(fill=tk.X)
 
 
-        filter_settings = tk.LabelFrame(sidebar, text="Rekonstruktion",padx=5,pady=5)
-        filter_settings.pack(fill=tk.X,side=tk.TOP)
-        note = tk.LabelFrame(filter_settings,text="optional:",padx=5,pady=5)
+        reco = tk.LabelFrame(sidebar, text="Rekonstruktion",padx=5,pady=5)
+        reco.pack(fill=tk.X,side=tk.TOP)
+        note = tk.LabelFrame(reco,text="optional:",padx=5,pady=5)
         note.pack()
         loadsino = tk.Button(note,text="Sinogramm laden",command=self.read_sino)
         loadsino.pack(fill=tk.X)
-        filterchoice1 = tk.Radiobutton(filter_settings,text="Ungefiltert", variable=self.filter,value=0)
-        filterchoice1.pack()
-        filterchoice2 = tk.Radiobutton(filter_settings,text="Ramp-Filter", variable=self.filter,value=1)
-        filterchoice2.pack()
-        go_reco = tk.Button(filter_settings,text="Starten",command=self.unfiltered_back)
+        go_reco = tk.Button(reco,text="Starten",command=self.back_projection)
         go_reco.pack(fill=tk.X)
-        save_reco = tk.Button(filter_settings,text="Rekonstruktion\nspeichern",command=self.save_image)
-        save_reco.pack(fill=tk.X)
 
-
-
-    def var_init(self):
-        """
-        Um sicher zu gehen dass auch beim Neuladen der Bilder jeweils alle
-        Variablen im Ausgangszustand sind, bietet sich diese Funktion an.
-        """
-
-        self.filename = None
-        self.input_array = None
-        self.output_array = None
-        self.res = None
-        self.sinogram = None
-        self.ubp = None
-        self.fbp = None
-        self.do_recon = 0
-        self.filter = 0
-        self.ltemp = None
-        self.rtemp = None
-
+        filters = tk.LabelFrame(sidebar,text="Filter für Rekonstrukion",padx=5,pady=5)
+        filters.pack(fill=tk.X,side=tk.TOP)
+        self.filterchoice = tk.IntVar(filters,value=0)
+        unfiltered = tk.Radiobutton(filters,text="Kein Filter",variable=self.filterchoice,value=0,indicatoron=0,command=self.filtering)
+        unfiltered.pack(fill=tk.X)
+        ramp = tk.Radiobutton(filters,text="Ramp-Filter",variable=self.filterchoice,value=1,indicatoron=0,command=self.filtering)
+        ramp.pack(fill=tk.X)
+        shepp = tk.Radiobutton(filters,text="Shepp-Logan",variable=self.filterchoice,value=2,indicatoron=0,command=self.filtering)
+        shepp.pack(fill=tk.X)
 
     def read_image(self):
-        self.var_init()
         filename = tkf.askopenfilename()
         if re.search(r"(\.npy$)",filename):
             self.input_array = np.load(filename)
-
         else:
             self.input_array = np.loadtxt(filename)
 
@@ -104,18 +84,22 @@ class ct:
     def read_sino(self):
         filename = tkf.askopenfilename()
         arr = np.load(filename)
-        self.input_array = arr
+        self.filterchoice.set(0)
+        self.sinogram = arr
         self.angles = arr[:,-1]
-        self.res = self.input_array.shape[1] - 1
-        self.show_image(self.input_array,0,self.input_canvas)
+        self.res = self.sinogram.shape[1] - 1
+        self.show_image(self.sinogram,0,self.input_canvas)
 
+    def save_left(self):
+        filename = tkf.asksaveasfilename()
+        np.save(filename,self.input_array)
 
-    def save_image(self):
+    def save_right(self):
         filename = tkf.asksaveasfilename()
         np.save(filename,self.output_array)
 
     def show_image(self,data,temp,target):
-        data *= 1./np.max(data) * 256
+        data = 1./np.max(data) * 256 * data
         size = 512,512
         if temp == 0:
             self.ltemp = Image.fromarray(data)
@@ -144,33 +128,42 @@ class ct:
         return rotated_image
 
     def create_sinogram(self):
-        self.angle_count = self.angle_picker.get()
-        self.angles = np.linspace(0,self.arc.get(),self.angle_count)
-        self.sinogram = np.zeros((self.angle_count,self.res+1))
+        self.angles = np.linspace(0,self.arc.get(),self.angle_picker.get())
+        self.sinogram = np.zeros((self.angle_picker.get(),self.res+1))
 
-        for angle in range(self.angle_count):
+        for angle in range(self.angle_picker.get()):
             self.sinogram[angle,:-1] = np.sum(
                 self.rotate_image(self.angles[angle],self.input_array),axis=1)
         self.sinogram[:,-1] = self.angles
         self.output_array = self.sinogram
         self.show_image(self.sinogram,1,self.output_canvas)
-        self.do_recon = 1
 
-    def unfiltered_back(self):
-        if self.do_recon == 1:
-            self.show_image(self.output_array,0,self.input_canvas)
-            self.input_array = self.output_array
+    def back_projection(self):
+        self.filterchoice.set(0)
+        self.input_array = self.sinogram
+        self.show_image(self.input_array,0,self.input_canvas)
         image = np.zeros((self.res,self.res))
-        for line in self.input_array:
+        for line in self.sinogram:
             image += self.rotate_image(-line[-1]-90,
-            np.ones((self.res,self.res)) * line[0:-1])
+               np.ones((self.res,self.res)) * line[:-1])
         self.output_array = image
-        if self.filter == 1:
-            self.ramp_filter(image)
-        elif self.filter == 0:
-            self.show_image(self.output_array,1,self.output_canvas)
+        self.ubp = image
+        self.show_image(self.ubp,1,self.output_canvas)
 
-    def ramp_filter(self,image):
+    def filtering(self):
+        self.input_array = self.ubp
+        self.show_image(self.ubp,0,self.input_canvas)
+
+        if self.filterchoice.get() == 0:
+            self.output_array = self.ubp
+        elif self.filterchoice.get() == 1:
+            self.output_array = self.ramp_filter()
+
+        self.show_image(self.output_array,1,self.output_canvas)
+
+
+    def ramp_filter(self):
+        image = self.ubp
         ft_image = np.fft.fftshift(np.fft.fft2(image))
         ramp = np.fromfunction(lambda x,y: np.sqrt((x-self.res/2)**2 +
             (y - self.res/2)**2),ft_image.shape)
@@ -178,7 +171,7 @@ class ct:
         ft_image *= ramp
         ft_image = np.abs(np.fft.ifft2(np.fft.ifftshift(ft_image)))
         ft_image[edge] = 0
-        self.output_array = ft_image
+        return ft_image
 
 root = tk.Tk()
 root.title("Computed Pytography")
