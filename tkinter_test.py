@@ -3,10 +3,11 @@
 Created on Wed Nov 18 09:57:27 2015
 @author: mick
 """
-import matplotlib
 matplotlib.use("TKAgg")
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import Tkinter as tk
-from PIL import Image, ImageTk
 import numpy as np
 import scipy.ndimage.interpolation as sip
 import re
@@ -23,14 +24,17 @@ class ct:
 
         input_frame = tk.LabelFrame(graph_frame,text="Ausgangsbild/geladenes Sinogramm",padx=5,pady=5)
         input_frame.pack(fill=tk.BOTH,padx=10,pady=10,side=tk.LEFT)
-        self.input_canvas = tk.Canvas(input_frame,width=512,height=512)
-        self.input_canvas.pack(side=tk.TOP)
+
+        self.input_fig = plt.figure("input",figsize=(5,5),dpi=108)
+        self.input_canvas = FigureCanvasTkAgg(self.input_fig,master=input_frame)
+        self.input_canvas.get_tk_widget().pack(side=tk.TOP)
         saveleft = tk.Button(input_frame,text="Bild speichern",command=self.save_left)
         saveleft.pack(side=tk.BOTTOM)
         output_frame = tk.LabelFrame(graph_frame,text="berechnetes Sinogramm/Rekonstruktion",padx=5,pady=5)
         output_frame.pack(fill=tk.BOTH,padx=10,pady=10,side=tk.RIGHT)
-        self.output_canvas = tk.Canvas(output_frame,width=512,height=512)
-        self.output_canvas.pack(fill=tk.BOTH,side=tk.TOP)
+        self.output_fig = plt.figure("output",figsize=(5,5),dpi=108)
+        self.output_canvas = FigureCanvasTkAgg(self.output_fig,master=output_frame)
+        self.output_canvas.get_tk_widget().pack(side=tk.TOP)
         saveright = tk.Button(output_frame,text="Bild speichern",command=self.save_right)
         saveright.pack(side=tk.BOTTOM)
 
@@ -71,6 +75,9 @@ class ct:
 #        shepp = tk.Radiobutton(filters,text="Shepp-Logan",variable=self.filterchoice,value=2,indicatoron=0,command=self.filtering)
 #        shepp.pack(fill=tk.X)
 
+        leave = tk.Button(sidebar,text="Beenden",command=root.destroy)
+        leave.pack(fill=tk.X,side=tk.BOTTOM)
+
     def read_image(self):
         filename = tkf.askopenfilename()
         if re.search(r"(\.npy$)",filename):
@@ -79,7 +86,11 @@ class ct:
             self.input_array = np.loadtxt(filename)
 
         self.res = self.input_array.shape[0]
-        self.show_image(self.input_array,0,self.input_canvas)
+        inc = int(self.res*1.4)
+        self.working_array = np.zeros((inc,inc))
+        self.working_array[self.res*0.2:1.2*self.res,self.res*0.2:1.2*self.res] = self.input_array
+        self.wres=inc
+        self.show_image(self.input_array,"input")
 
     def read_sino(self):
         filename = tkf.askopenfilename()
@@ -88,7 +99,7 @@ class ct:
         self.sinogram = arr
         self.angles = arr[:,-1]
         self.res = self.sinogram.shape[1] - 1
-        self.show_image(self.sinogram,0,self.input_canvas)
+        self.show_image(self.sinogram,"input")
 
     def save_left(self):
         filename = tkf.asksaveasfilename()
@@ -98,19 +109,15 @@ class ct:
         filename = tkf.asksaveasfilename()
         np.save(filename,self.output_array)
 
-    def show_image(self,data,temp,target):
-        data = 1./np.max(data) * 256 * data
-        size = 512,512
-        if temp == 0:
-            self.ltemp = Image.fromarray(data)
-            self.ltemp = ImageTk.PhotoImage(self.ltemp.resize(size,Image.BICUBIC))
-            target.create_image(0,0,image=self.ltemp,anchor="nw")
-
-        elif temp == 1:
-            self.rtemp = Image.fromarray(data)
-            self.rtemp = ImageTk.PhotoImage(self.rtemp.resize(size,Image.BICUBIC))
-            target.create_image(0,0,image=self.rtemp,anchor="nw")
-
+    def show_image(self,data,target):
+        plt.figure(target)
+        plt.imshow(data,aspect="auto")
+        plt.set_cmap("gray")
+        plt.axis("off")
+        plt.xticks([]), plt.yticks([])
+        fig = plt.gcf()
+        fig.tight_layout(pad=0,w_pad=0,h_pad=0)
+        fig.canvas.draw()
 
     def get_indices(self, angle):
         """
@@ -118,37 +125,39 @@ class ct:
         der entsprechende Pixel im gedrehten Bild zusammengesetzt ist.
         """
         angle *= 2*np.pi/360.
-        return np.fromfunction(lambda x,y,z: (z - (self.res-1)/2)*
-            np.sin(angle + x*np.pi/2) + (-1)**x * (y - (self.res-1)/2)*
-            np.cos(angle - x*np.pi/2) + self.res/2, (2,self.res,self.res))
+        return np.fromfunction(lambda x,y,z: (z - (self.wres-1)/2)*
+            np.sin(angle + x*np.pi/2) + (-1)**x * (y - (self.wres-1)/2)*
+            np.cos(angle - x*np.pi/2) + self.wres/2, (2,self.wres,self.wres))
 
     def rotate_image(self, angle,image):
+        smallest = np.min(image)
         rotated_image = sip.map_coordinates(image,self.get_indices(angle))
-        rotated_image[rotated_image < 0] = 0
+        rotated_image[rotated_image < smallest] = smallest
         return rotated_image
 
     def create_sinogram(self):
         self.angles = np.linspace(0,self.arc.get(),self.angle_picker.get())
-        self.sinogram = np.zeros((self.angle_picker.get(),self.res+1))
-
+        self.sinogram = np.zeros((self.angle_picker.get(),self.wres+1))
         for angle in range(self.angle_picker.get()):
             self.sinogram[angle,:-1] = np.sum(
-                self.rotate_image(self.angles[angle],self.input_array),axis=1)
+                self.rotate_image(self.angles[angle],self.working_array),axis=1)
         self.sinogram[:,-1] = self.angles
         self.output_array = self.sinogram
-        self.show_image(self.sinogram,1,self.output_canvas)
+        self.show_image(self.sinogram,"output")
 
     def back_projection(self):
         self.filterchoice.set(0)
         self.input_array = self.sinogram
-        self.show_image(self.input_array,0,self.input_canvas)
-        image = np.zeros((self.res,self.res))
+        self.show_image(self.input_array,"input")
+        image = np.zeros((self.wres,self.wres))
         for line in self.sinogram:
             image += self.rotate_image(-line[-1]-90,
-               np.ones((self.res,self.res)) * line[:-1])
+               np.ones((self.wres,self.wres)) * line[:-1])
+        image = image[self.res*0.2:1.2*self.res,self.res*0.2:1.2*self.res]
+        image = image/np.max(image) * 256
         self.output_array = image
         self.ubp = image
-        self.show_image(self.ubp,1,self.output_canvas)
+        self.show_image(self.ubp,"output")
 
     def filtering(self):
         if self.filterchoice.get() == 0:
@@ -158,7 +167,7 @@ class ct:
         elif self.filterchoice.get() == 2:
             self.output_array = self.shepp_logan()
 
-        self.show_image(self.output_array,1,self.output_canvas)
+        self.show_image(self.output_array,"output")
 
 
     def ramp_filter(self):
@@ -168,8 +177,9 @@ class ct:
             (y - self.res/2)**2),ft_image.shape)
         ft_image *= ramp
         ft_image = np.abs(np.fft.ifft2(np.fft.ifftshift(ft_image)))
-        edge = ramp >= self.res/2.05
-        ft_image[edge] = 0
+        mask = np.ones(ft_image.shape,dtype=bool)
+        mask[5:-5,5:-5] = False
+        ft_image[mask] = np.min(ft_image)
         return ft_image
 
 root = tk.Tk()
