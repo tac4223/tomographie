@@ -86,10 +86,9 @@ class ct:
             self.input_array = np.loadtxt(filename)
 
         self.res = self.input_array.shape[0]
-        inc = int(self.res*1.4)
-        self.working_array = np.zeros((inc,inc))
+        self.wres = int(self.res*1.4)
+        self.working_array = np.zeros((self.wres,self.wres))
         self.working_array[self.res*0.2:1.2*self.res,self.res*0.2:1.2*self.res] = self.input_array
-        self.wres=inc
         self.show_image(self.input_array,"input")
 
     def read_sino(self):
@@ -98,7 +97,8 @@ class ct:
         self.filterchoice.set(0)
         self.sinogram = arr
         self.angles = arr[:,-1]
-        self.res = self.sinogram.shape[1] - 1
+        self.wres = self.sinogram.shape[1] - 1
+        self.res = self.sinogram[-1,0]
         self.show_image(self.sinogram,"input")
 
     def save_left(self):
@@ -142,6 +142,7 @@ class ct:
             self.sinogram[angle,:-1] = np.sum(
                 self.rotate_image(self.angles[angle],self.working_array),axis=1)
         self.sinogram[:,-1] = self.angles
+        self.sinogram[-1,0] = self.res
         self.output_array = self.sinogram
         self.show_image(self.sinogram,"output")
 
@@ -154,7 +155,7 @@ class ct:
             image += self.rotate_image(-line[-1]-90,
                np.ones((self.wres,self.wres)) * line[:-1])
         image = image[self.res*0.2:1.2*self.res,self.res*0.2:1.2*self.res]
-        image = image/np.max(image) * 256
+        image = image/np.max(image) * 255
         self.output_array = image
         self.ubp = image
         self.show_image(self.ubp,"output")
