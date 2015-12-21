@@ -3,7 +3,8 @@
 Created on Wed Nov 18 09:57:27 2015
 @author: mick
 """
-#matplotlib.use("TKAgg")
+import matplotlib
+matplotlib.use("TKAgg")
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -41,7 +42,7 @@ class ct:
 
 
         self.sino_settings = tk.LabelFrame(sidebar, text="Sinogramm",padx=5,pady=5)
-        self.arc = tk.IntVar(self.sino_settings,180)
+        self.arc = tk.IntVar(self.sino_settings,360)
         self.sino_settings.pack(fill=tk.X,side=tk.TOP)
         loadimg = tk.Button(self.sino_settings,text="Ausgangsbild laden",command=self.read_image)
         loadimg.pack(fill=tk.X)
@@ -70,7 +71,7 @@ class ct:
         self.filterchoice = tk.IntVar(filters,value=0)
         unfiltered = tk.Radiobutton(filters,text="Kein Filter",variable=self.filterchoice,value=0,indicatoron=0,command=self.filtering)
         unfiltered.pack(fill=tk.X)
-        ramp = tk.Radiobutton(filters,text="Ramp-Filter",variable=self.filterchoice,value=1,indicatoron=0,command=self.filtering)
+        ramp = tk.Radiobutton(filters,text="Ramp-Filter",variable=self.filterchoice,value=1,indicatoron=0,command=self.ramp)
         ramp.pack(fill=tk.X)
 #        shepp = tk.Radiobutton(filters,text="Shepp-Logan",variable=self.filterchoice,value=2,indicatoron=0,command=self.filtering)
 #        shepp.pack(fill=tk.X)
@@ -130,9 +131,9 @@ class ct:
             np.cos(angle - x*np.pi/2) + self.wres/2, (2,self.wres,self.wres))
 
     def rotate_image(self, angle,image):
-        smallest = np.min(image)
+#        smallest = np.min(image)
         rotated_image = sip.map_coordinates(image,self.get_indices(angle))
-        rotated_image[rotated_image < smallest] = smallest
+#        rotated_image[rotated_image < smallest] = smallest
         return rotated_image
 
     def create_sinogram(self):
@@ -170,6 +171,15 @@ class ct:
 
         self.show_image(self.output_array,"output")
 
+    def ramp(self):
+        line = self.sinogram[:,:-1]
+        ft_image = np.fft.fftshift(np.fft.fft(line,axis=1),axes=1)
+        ramp = np.abs(np.linspace(-1,1,line.shape[-1]))
+        ft_image *= ramp
+        ft_image = np.abs(np.fft.ifft(np.fft.ifftshift(ft_image,axes=1),axis=1))
+        self.sinogram[:,:-1] = ft_image
+        self.output_array = self.sinogram
+        self.show_image(self.output_array,"output")
 
     def ramp_filter(self):
         image = self.ubp
@@ -183,7 +193,8 @@ class ct:
         ft_image[mask] = np.min(ft_image)
         return ft_image
 
-root = tk.Tk()
-root.title("Computed Pytography")
-test = ct(root)
-root.mainloop()
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.title("Computed Pytography")
+    test = ct(root)
+    root.mainloop()
